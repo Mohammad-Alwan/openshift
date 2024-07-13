@@ -1,0 +1,19 @@
+#Bastion
+10.19.4.34 bastion.ocp4.lab bastion
+#Master
+10.19.4.35 bootstrap.ocp4.lab bootstrap
+10.19.4.36 master0.ocp4.lab master0
+10.19.4.36 etcd-0.ocp4.lab
+10.19.4.37 master1.ocp4.lab master1
+10.19.4.37 etcd-1.ocp4.lab
+10.19.4.38 master2.ocp4.lab master2
+10.19.4.38 etcd-2.ocp4.lab
+#Worker
+10.19.4.39 worker0.ocp4.lab worker0
+10.19.4.40 worker1.ocp4.lab worker1
+##infra (for monitoring and logging usage only with elasticsearch and grafana)
+#10.19.4.201 infra0.clustername.fqdn infra0
+#10.19.4.202 infra1.clustername.fqdn infra1
+#api
+10.19.4.34 api-int.ocp4.lab api-int
+10.19.4.34 api.ocp4.lab api
