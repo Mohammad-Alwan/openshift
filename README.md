@@ -3,7 +3,7 @@ firewall-cmd --add-port=1936/tcp --add-port=9000-9999/tcp --add-port=10250-10259
 https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/4.15.0/openshift-client-linux-4.15.0.tar.gz
 https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/4.15.0/openshift-install-linux-4.15.0.tar.gz
 
-===================================================================================================================
+========================================================================
 
 #####Deploy Openshift 4.14#####
 firewall-cmd --add-port={8080,80,443,22623,6443}/tcp --add-port=53/udp --permanent
