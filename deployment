@@ -58,15 +58,15 @@ vi /etc/hosts
 10.19.4.34 bastion.ocp-redhat.bcaf.lab bastion
 #Master
 10.19.4.35 bootstrap.ocp-redhat.bcaf.lab bootstrap
-10.19.4.36 master1.ocp-redhat.bcaf.lab master0
-10.19.4.36 etcd-1.ocp-redhat.bcaf.lab
-10.19.4.37 master2.ocp-redhat.bcaf.lab master1
-10.19.4.37 etcd-2.ocp-redhat.bcaf.lab
-10.19.4.38 master3.ocp-redhat.bcaf.lab master2
-10.19.4.38 etcd-3.ocp-redhat.bcaf.lab
+10.19.4.36 master0.ocp-redhat.bcaf.lab master0
+10.19.4.36 etcd-0.ocp-redhat.bcaf.lab
+10.19.4.37 master1.ocp-redhat.bcaf.lab master1
+10.19.4.37 etcd-1.ocp-redhat.bcaf.lab
+10.19.4.38 master2.ocp-redhat.bcaf.lab master2
+10.19.4.38 etcd-2.ocp-redhat.bcaf.lab
 #Worker
-10.19.4.39 worker1.ocp-redhat.bcaf.lab worker0
-10.19.4.40 worker2.ocp-redhat.bcaf.lab worker1
+10.19.4.39 worker0.ocp-redhat.bcaf.lab worker0
+10.19.4.40 worker1.ocp-redhat.bcaf.lab worker1
 ##infra (for monitoring and logging usage only with elasticsearch and grafana)
 #10.19.4.201 infra0.clustername.fqdn infra0
 #10.19.4.202 infra1.clustername.fqdn infra1
@@ -116,31 +116,31 @@ listen api-server-6443
        bind *:6443
        mode tcp
        server bootstrap bootstrap.ocp-redhat.bcaf.lab:6443 check inter 1s backup
+       server master0 master0.ocp-redhat.bcaf.lab:6443 check inter 1s
        server master1 master1.ocp-redhat.bcaf.lab:6443 check inter 1s
        server master2 master2.ocp-redhat.bcaf.lab:6443 check inter 1s
-       server master3 master3.ocp-redhat.bcaf.lab:6443 check inter 1s
 
 listen machine-config-server-22623
        bind *:22623
        mode tcp
        server bootstrap bootstrap.ocp-redhat.bcaf.lab:22623 check inter 1s backup
+       server master0 master0.ocp-redhat.bcaf.lab:22623 check inter 1s
        server master1 master1.ocp-redhat.bcaf.lab:22623 check inter 1s
        server master2 master2.ocp-redhat.bcaf.lab:22623 check inter 1s
-       server master3 master3.ocp-redhat.bcaf.lab:22623 check inter 1s
 
 listen ingress-router-443
        bind *:443
        mode tcp
        balance source
+       server worker0 worker0.ocp-redhat.bcaf.lab:443 check inter 1s
        server worker1 worker1.ocp-redhat.bcaf.lab:443 check inter 1s
-       server worker2 worker2.ocp-redhat.bcaf.lab:443 check inter 1s
 
 listen ingress-router-80
        bind *:80
        mode tcp
        balance source
+       server worker0 worker0.ocp-redhat.bcaf.lab:80 check inter 1s
        server worker1 worker1.ocp-redhat.bcaf.lab:80 check inter 1s
-       server worker2 worker2.ocp-redhat.bcaf.lab:80 check inter 1s
 
 ###
 systemctl restart haproxy
@@ -236,3 +236,538 @@ while true; do oc get csr -o name | xargs oc adm certificate approve; sleep 30; 
 ##Access Console##
 oc get route
 oc get routes console -n openshift-console -o jsonpath='{"https://"}{.spec.host}{"\n"}'
+
+
+
+###CONFIGURATION###
+#bash completion
+
+oc completion bash > oc_bash_completion
+sudo cp oc_bash_completion /etc/bash_completion.d/
+
+#NodeSelector Labels
+oc label node monitoring0{1..2}.clustername.fqdn node-role.kubernetes.io/infra=
+oc label node monitoring0{1..2}.clustername.fqdn node-role.kubernetes.io/worker-
+oc label node logging0{1..3}.clustername.fqdn node-role.kubernetes.io/logging=
+oc label node logging0{1..3}.clustername.fqdn node-role.kubernetes.io/worker-
+oc label node router0{1..3}.clustername.fqdn node-role.kubernetes.io/router=
+oc label node router0{1..3}.clustername.fqdn node-role.kubernetes.io/worker-
+oc label node storage0{1..3}.wsa.bcaf.co.id node-role.kubernetes.io/storage=
+oc label node storage0{1..3}.wsa.bcaf.co.id node-role.kubernetes.io/worker-
+
+##Machine Config Pool
+oc get mcp worker -o yaml > yaml_collection/mcp.yml
+vi yaml_collection/mcp.yml (sample content file, ubah sesuai node role)
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfigPool
+metadata:
+  labels:
+    machineconfiguration.openshift.io/mco-built-in: ''
+  name: namanoderole
+spec:
+  configuration:
+    name: namanoderole-infra-4cb6680af8b16b6224e36c11490ff22f
+    source:
+      - apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        name: 00-worker
+      - apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        name: 01-worker-container-runtime
+      - apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        name: 01-worker-kubelet
+      - apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        name: 99-worker-16878f5b-194c-4257-a49d-94de6792b7c8-registries
+      - apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        name: 99-worker-ssh
+  machineConfigSelector:
+    matchLabels:
+      machineconfiguration.openshift.io/role: worker
+  nodeSelector:
+    matchLabels:
+      node-role.kubernetes.io/namanoderole: ''
+  paused: false
+
+
+
+##Gerbage Collection
+oc label machineconfigpool worker custom-kubelet=small-pods
+# oc label machineconfigpool master custom-kubelet=small-pods
+vi garbage-collection.yaml
+apiVersion: machineconfiguration.openshift.io/v1
+kind: KubeletConfig
+metadata:
+  name: worker-kubeconfig 
+spec:
+  autoSizingReserved: true 
+  machineConfigPoolSelector:
+    matchLabels:
+      custom-kubelet: small-pods  
+  kubeletConfig:
+    evictionSoft: 
+      memory.available: "500Mi" 
+      nodefs.available: "10%"
+      nodefs.inodesFree: "5%"
+      imagefs.available: "15%"
+      imagefs.inodesFree: "10%"
+    evictionSoftGracePeriod:  
+      memory.available: "1m30s"
+      nodefs.available: "1m30s"
+      nodefs.inodesFree: "1m30s"
+      imagefs.available: "1m30s"
+      imagefs.inodesFree: "1m30s"
+    evictionHard: 
+      memory.available: "200Mi"
+      nodefs.available: "5%"
+      nodefs.inodesFree: "4%"
+      imagefs.available: "10%"
+      imagefs.inodesFree: "5%"
+    evictionPressureTransitionPeriod: 0s 
+    imageMinimumGCAge: 5m 
+    imageGCHighThresholdPercent: 80 
+    imageGCLowThresholdPercent: 75 
+	
+oc apply -f yaml_collection/worker-kubeconfig.yml
+
+##Setting router (for ingress)
+#oc label node router0{1..3}.clustername.fqdn router=true
+oc label node router1.clustername.fqdn node-role.kubernetes.io/router=
+oc edit IngressController default -n openshift-ingress-operator
+
+nodePlacement:
+    nodeSelector:
+      matchLabels:
+        node-role.kubernetes.io/router: ""
+  replicas: 2
+  
+- or by label node -
+
+nodePlacement:
+    nodeSelector:
+      matchLabels:
+        router: "true"
+  replicas: 2
+  
+oc get pod -n openshift-ingress -o wide
+oc get pod -n openshift-ingress-operator -o wide
+oc get hostsubnets.network.openshift.io -o wide
+
+
+##NTP
+curl https://mirror.openshift.com/pub/openshift-v4/clients/butane/latest/butane-amd64 --output butane
+chmod +x butane
+cp butane /usr/bin/butane
+vi yaml_collection/butane-chrony.master.bu
+variant: openshift
+version: 4.16.0
+metadata:
+  name: 99-master-chrony-configuration
+  labels:
+    machineconfiguration.openshift.io/role: master
+openshift:
+  kernel_arguments:
+    - loglevel=7
+storage:
+  files:
+    - path: /etc/chrony.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          pool 0.rhel.pool.ntp.org iburst
+          driftfile /var/lib/chrony/drift
+          makestep 1.0 3
+          rtcsync
+          logdir /var/log/chrony
+
+
+butane yaml_collection/butane-chrony-master.bu -o yaml_collection/butane-chrony-master.yaml
+oc apply -f yaml_collection/butane-chrony-master.yaml
+
+vi yaml_collection/butane-chrony-worker.bu
+variant: openshift
+version: 4.xx.xx
+metadata:
+  name: 99-worker-chrony-configuration
+  labels:
+    machineconfiguration.openshift.io/role: worker
+openshift:
+  kernel_arguments:
+    - loglevel=7
+storage:
+  files:
+    - path: /etc/chrony.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          pool 0.rhel.pool.ntp.org iburst
+          driftfile /var/lib/chrony/drift
+          makestep 1.0 3
+          rtcsync
+          logdir /var/log/chrony
+
+butane yaml_collection/butane-chrony-worker.bu -o yaml_collection/butane-chrony-worker.yaml
+oc apply -f yaml_collection/butane-chrony-worker.yaml
+
+
+###Project Template
+oc adm create-bootstrap-project-template -o yaml > template.yaml
+vi template.yaml
+kind: Template
+metadata:
+  creationTimestamp: null
+  name: project-request
+objects:
+- apiVersion: project.openshift.io/v1
+  kind: Project
+  metadata:
+    annotations:
+      openshift.io/description: ${PROJECT_DESCRIPTION}
+      openshift.io/display-name: ${PROJECT_DISPLAYNAME}
+      openshift.io/requester: ${PROJECT_REQUESTING_USER}
+      openshift.io/node-selector: node-role.kubernetes.io/worker=
+    creationTimestamp: null
+    name: ${PROJECT_NAME}
+  spec: {}
+  status: {}
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    creationTimestamp: null
+    name: admin
+    namespace: ${PROJECT_NAME}
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: admin
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: ${PROJECT_ADMIN_USER}
+parameters:
+- name: PROJECT_NAME
+- name: PROJECT_DISPLAYNAME
+- name: PROJECT_DESCRIPTION
+- name: PROJECT_ADMIN_USER
+- name: PROJECT_REQUESTING_USER
+
+	#Do not forget to add 
+	#openshift.io/node-selector: node-role.kubernetes.io/worker= 
+	#to prevent other pods create outside worker node
+oc create -f template.yaml -n openshift-config
+oc edit project.config.openshift.io/cluster (to Update the spec section to include the projectRequestTemplate and name parameters, and set the name of your uploaded project template.)
+spec:
+  projectRequestTemplate:
+    name: <template_name>
+#Verify	
+	oc new-project test
+	oc describe project test
+
+
+
+###Add user
+htpasswd -c -B -b users.htpasswd ocp password
+oc create secret generic htpass-secret --from-file=htpasswd=users.htpasswd -n openshift-config 
+#oc adm policy add-cluster-role-to-user cluster-admin ocp
+vi create-user.yml
+apiVersion: config.openshift.io/v1
+kind: OAuth
+metadata:
+  name: cluster
+spec:
+  identityProviders:
+  - name: LocalUser
+    mappingMethod: claim 
+    type: HTPasswd
+    htpasswd:
+      fileData:
+        name: htpass-secret 
+
+oc apply -f create-user.yml
+oc adm policy add-cluster-role-to-user cluster-admin ocp
+
+
+###Local Storage Operator
+oc adm new-project openshift-local-storage
+oc annotate namespace openshift-local-storage openshift.io/node-selector=''
+1. Operators → OperatorHub.
+2. search Local Storage & Install
+3. On the Install Operator page, select *A specific namespace on the cluster*. Select *openshift-local-storage* from the drop-down menu.
+4. Adjust the values for Update Channel and Approval Strategy to the values that you want. and install
+
+Verify
+oc -n openshift-local-storage get pods (Running)
+oc -n openshift-local-storage get pods
+oc get csvs -n openshift-local-storage
+ 
+ 
+####Logical Volume Storage
+#vi local-volume.yaml
+#apiVersion: "local.storage.openshift.io/v1"
+#kind: "LocalVolume"
+#metadata:
+#  name: "local-disks"
+#  namespace: "openshift-local-storage" 
+#spec:
+#  nodeSelector: 
+#    nodeSelectorTerms:
+#    - matchExpressions:
+#        - key: kubernetes.io/hostname
+#          operator: In
+#          values:
+#          - storage0.fqdn
+#          - storage1.fqdn
+#          - storage2.fqdn
+#  storageClassDevices:
+#    - storageClassName: "local-sc" 
+#      volumeMode: Block 
+#      devicePaths: 
+#        - /path/to/device
+
+####Creating OpenShift Data Foundation cluster on bare metal
+- Installing Local Storage Operator
+- Installing Red Hat OpenShift Data Foundation Operator
+	-). Operators > OperatorHub.
+	-). Search Openshift Data Foundation & Install
+		- stable-4.16.
+		-  A specific namespace on the cluster.
+		- Installed Namespace as Operator recommended namespace openshift-storage. 
+		- Enable option is selected for the Console plugin. & Install
+- Operators Installed Operators ( Project selected is openshift-storage.)
+- Click on the OpenShift Data Foundation operator, and then click Create StorageSystem.
+- In the Backing storage page, perform the following:
+	Select Full Deployment for the Deployment type option.
+	Select the Create a new StorageClass using the local storage devices option.
+- In the Create local volume set page, provide the following information:
+	Enter a name for the LocalVolumeSet and the StorageClass.
+- Disk Type, select SSD/NVMe.
+
+continue to finish
+
+#Verify after installation ODF running all (pods,  Object Gateway, storage classes)
+
+#Run the following command to apply default storage class
+#oc patch storageclass ocs-storagecluster-cephfs -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "true"}}}'
+
+
+
+##Operator Logging (Installing Logging and the Loki Operator using the web console)
+Install Loki Operator 
+
+1. Administrator → Operator → OperatorHUb
+2. search Loki Operator and Install
+3. Select stable or stable-x.y as the Update channel.
+4. Select Enable *Operator-recommended cluster monitoring on this namespace.*
+5. For Update approval select Automatic, then click Install. (this step using *Manual*)
+
+1. Install the Red Hat OpenShift Logging Operator:
+2. Operators → OperatorHub.
+3. Red Hat OpenShift Logging → Install
+	note: Ensure that the A specific namespace on the cluster is selected under Installation Mode.
+		  Ensure that Operator recommended namespace is openshift-logging under Installed Namespace.
+4. Select Enable Operator recommended cluster monitoring on this namespace.
+5. Select stable-5.y as the Update Channel.
+6. For Update approval select Automatic, then click Install. (this step set *Manual*) & Install
+7. Go to the Operators → Installed Operators page. Click the All instances tab.
+8. From the Create new drop-down list, select LokiStack.
+9. Select YAML view, and then use the following template to create a LokiStack CR:
+apiVersion: loki.grafana.com/v1
+kind: LokiStack
+metadata:
+  name: logging-loki
+  namespace: openshift-logging
+spec:
+  managementState: Managed
+  size: 1x.small
+  storage:
+    schemas:
+      - effectiveDate: '2022-06-01'
+        version: v12
+    secret:
+      name: logging-loki-s3
+      type: s3
+  storageClassName:  ocs-storagecluster-cephfs
+  template:
+    compactor:
+      nodeSelector:
+        node-role.kubernetes.io/logging: ''
+    distributor:
+      nodeSelector:
+        node-role.kubernetes.io/logging: ''
+    gateway:
+      nodeSelector:
+        node-role.kubernetes.io/logging: ''
+    indexGateway:
+      nodeSelector:
+        node-role.kubernetes.io/logging: ''
+    ingester:
+      nodeSelector:
+        node-role.kubernetes.io/logging: ''
+    querier:
+      nodeSelector:
+        node-role.kubernetes.io/logging: ''
+    queryFrontend:
+      nodeSelector:
+        node-role.kubernetes.io/logging: ''
+    ruler:
+      nodeSelector:
+        node-role.kubernetes.io/logging: ''
+  tenants:
+    mode: openshift-logging
+
+oc create sa collector -n openshift-logging
+
+vi cluster-role-loki.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: logging-collector-logs-writer
+rules:
+- apiGroups:
+  - loki.grafana.com
+  resourceNames:
+  - logs
+  resources:
+  - application
+  - audit
+  - infrastructure
+  verbs:
+  - create
+
+oc adm policy add-cluster-role-to-user logging-collector-logs-writer -z collector
+####Install Cluster Observability 
+#(using web console)
+1. Operators → OperatorHub.
+2. Search cluster observability operator
+3. Update channel → development
+	Version → <most_recent_version>
+	Installation mode → All namespaces on the cluster (default)
+	Installed Namespace → openshift-operators
+	Update approval → Automatic
+4. Install 
+#(using cli)
+vi cluster-observability-loki.yaml
+apiVersion: observability.openshift.io/v1alpha1
+kind: UIPlugin
+metadata:
+  name: logging
+spec:
+  type: Logging
+  logging:
+    lokiStack:
+      name: logging-loki
+
+oc adm policy add-cluster-role-to-user collect-application-logs -z collector
+oc adm policy add-cluster-role-to-user collect-audit-logs -z collector
+oc adm policy add-cluster-role-to-user collect-infrastructure-logs -z collector
+
+vi ClusterLogForwarde.yaml	
+apiVersion: observability.openshift.io/v1
+kind: ClusterLogForwarder
+metadata:
+  name: collector
+  namespace: openshift-logging
+spec:
+  serviceAccount:
+    name: collector
+  outputs:
+  - name: default-lokistack
+    type: lokiStack
+    lokiStack:
+      target:
+        name: logging-loki
+        namespace: openshift-logging
+      authentication:
+        token:
+          from: serviceAccount
+    tls:
+      ca:
+        key: service-ca.crt
+        configMapName: openshift-service-ca.crt
+  pipelines:
+  - name: default-logstore
+    inputRefs:
+    - application
+    - infrastructure
+    outputRefs:
+    - default-lokistack
+
+
+#Verify that logs are visible in the Log section of the Observe tab in the OpenShift web console.
+#Switch to the Workloads → Pods page.
+#Select the openshift-logging project.
+
+###verify operator
+oc get subscription
+#oc get installplan -n <namespace>
+# Patch install plans to approve
+	#oc patch installplan <installplan-name> -n <namespace> --type merge --patch '{"spec":{"approved":true}}'
+#oc describe subscription cluster-logging -n openshift-logging
+#
+
+
+####Synchronize-time
+timedatectl set-ntp true
+#systemctl restart systemd-timesyncd
+server time.google.com iburst
+#server 0.id.pool.ntp.org
+#server 1.id.pool.ntp.org
+#server 2.id.pool.ntp.org
+#server 3.id.pool.ntp.org
+
+
+##verify ODF 
+OpenShift Data Foundation Operator
+	ocs-operator-* (1 pod on any storage node)
+	ocs-metrics-exporter-* (1 pod on any storage node)
+	odf-operator-controller-manager-* (1 pod on any storage node)
+	odf-console-* (1 pod on any storage node)
+	csi-addons-controller-manager-* (1 pod on any storage node)
+Rook-ceph Operator
+	rook-ceph-operator-*
+	(1 pod on any storage node)
+Multicloud Object Gateway
+	noobaa-operator-* (1 pod on any storage node)
+	noobaa-core-* (1 pod on any storage node)
+	noobaa-db-pg-* (1 pod on any storage node)
+	noobaa-endpoint-* (1 pod on any storage node)
+MON
+	rook-ceph-mon-*
+	(3 pods distributed across storage nodes)
+MGR
+	rook-ceph-mgr-*
+	(1 pod on any storage node)
+MDS
+	rook-ceph-mds-ocs-storagecluster-cephfilesystem-*
+	(2 pods distributed across storage nodes)
+RGW
+	rook-ceph-rgw-ocs-storagecluster-cephobjectstore-* (1 pod on any storage node)
+CSI
+	cephfs
+		csi-cephfsplugin-* (1 pod on each storage node)
+		csi-cephfsplugin-provisioner-* (2 pods distributed across storage nodes)
+	rbd
+		csi-rbdplugin-* (1 pod on each storage node)
+		csi-rbdplugin-provisioner-* (2 pods distributed across storage nodes)
+rook-ceph-crashcollector
+	rook-ceph-crashcollector-*
+	(1 pod on each storage node)
+OSD
+	rook-ceph-osd-* (1 pod for each device)
+
+Verify that the following storage classes are created with the OpenShift Data Foundation cluster creation:
+	ocs-storagecluster-ceph-rbd
+	ocs-storagecluster-cephfs
+	openshift-storage.noobaa.io
+	ocs-storagecluster-ceph-rgw
+
+###for LB
+#edit dns for masing-masing node dengan di cluster
+##edit for dns
+oc get po -o wide | grep -i worker1
+dns-default-sszrv     2/2     Running   4          44h   10.234.6.9    worker1.ocp-redhat.bcaf.lab    <none>           <none>
+node-resolver-v5d69   1/1     Running   2          44h   10.19.2.121   worker1.ocp-redhat.bcaf.lab    <none>           <none>
