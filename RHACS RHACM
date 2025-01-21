@@ -1,0 +1,89 @@
+# ###RHACS dan RHACM
+# RHACS
+# Prerequisites
+# 	RHACS Deployment: Ensure that RHACS is deployed and operational in your environment.
+# 	OpenShift Cluster Access: Administrator access to the OpenShift cluster to be added.
+# 	OC CLI Installed: The oc CLI must be installed and authenticated to the target OpenShift cluster.
+# 	RHACS Credentials: Access to the RHACS Central instance and the required API token.
+# 	Network Configuration: Ensure network connectivity between the OpenShift cluster and the RHACS Central instance..
+# Procedure
+# 	Add the Cluster to RHACS
+# 		Log in to the RHACS Central web UI.
+# 		Navigate to Clusters > Add Cluster.
+# 		Enter a name for the cluster and configure any required settings.
+# 		Generate and download the Cluster Initialization Bundle for the cluster.
+# 	Deploy RHACS Components to OpenShift
+# 		Extract the downloaded initialization bundle.
+# 		Navigate to the extracted folder and locate the YAML files.
+# 		Apply the YAML files to the OpenShift cluster:
+# 			oc apply -f <path-to-extracted-yaml-files>
+# 		Verify that all pods in the stackrox namespace are running:
+# 			oc get pods -n stackrox
+# 
+# 6.1 Installing the RHACS Operator for RHACS Cloud Service 
+# Using the OperatorHub provided with OpenShift Container Platform is the easiest way to install the RHACS Operator.
+# Prerequisites
+# 	You have access to an OpenShift Container Platform cluster using an account with Operator installation permissions.
+# 	You must be using OpenShift Container Platform 4.12 or later. For information about supported platforms and architecture, see the Red Hat Advanced Cluster Security for Kubernetes Support Matrix.
+# Procedure
+# 	In the web console, go to the Operators 
+# 	OperatorHub page.
+# 	If Red Hat Advanced Cluster Security for Kubernetes is not displayed, enter Advanced Cluster Security into the Filter by keyword box to find the Red Hat Advanced Cluster Security for Kubernetes Operator.
+# 	Select the Red Hat Advanced Cluster Security for Kubernetes Operator to view the details page.
+# 	Read the information about the Operator, and then click Install.
+# 	On the Install Operator page:
+# 		Keep the default value for Installation mode as All namespaces on the cluster.
+# 		Select a specific namespace in which to install the Operator for the Installed namespace field. Install the Red Hat Advanced Cluster Security for Kubernetes Operator in the rhacs-operator namespace.
+# 		Select automatic or manual updates for Update approval.
+# 		If you select automatic updates, when a new version of the Operator is available, Operator Lifecycle Manager (OLM) automatically upgrades the running instance of your Operator.
+# 		If you select manual updates, when a newer version of the Operator is available, OLM creates an update request. As a cluster administrator, you must manually approve the update request to update the Operator to the latest version.
+# 		Red Hat recommends enabling automatic upgrades for Operator in RHACS Cloud Service. See the Red Hat Advanced Cluster Security for Kubernetes Support Matrix for more information.
+# 	Click Install.
+# Verification
+# 	After the installation completes, go to Operators 
+# 	Installed Operators to verify that the Red Hat Advanced Cluster Security for Kubernetes Operator is listed with the status of Succeeded.
+# 6.2 Installing secured cluster services 
+# You can install Secured Cluster services on your clusters by using the Operator, which creates the SecuredCluster custom resource. You must install the Secured Cluster services on every cluster in your environment that you want to monitor.
+# Prerequisites
+# 	If you are using OpenShift Container Platform, you must install version 4.12 or later.
+# 	You have installed the RHACS Operator on the cluster that you want to secure, called the secured cluster.
+# 	You have generated an init bundle and applied it to the cluster.
+# Procedure
+# 	On the OpenShift Container Platform web console for the secured cluster, go to the Operators 
+# 	Installed Operators page.
+# 	Click the RHACS Operator.
+# 	If you have installed the Operator in the recommended namespace, OpenShift Container Platform lists the project as stackrox. Select Project: rhacs-operator 
+# 	Create project.
+# 	Click Secured Cluster from the central navigation menu in the Operator details page.
+# 	Click Create SecuredCluster.
+# 6.3 Validate Cluster Security	
+# 	Use RHACS to perform a security assessment of the cluster.
+# 	Deploy a sample application and validate policies.
+# 	Review RHACS logs and dashboards for potential issues.
+# 
+# RHACM
+# 7. Adding an Existing OpenShift Cluster to Red Hat Advanced Cluster Management (RHACM)
+# This guide outlines the steps to integrate an existing OpenShift Container Platform (OCP) cluster with Red Hat Advanced Cluster Management (RHACM). RHACM provides centralized management and governance for OpenShift clusters.
+# - Prerequisites
+# 	RHACM Deployment: Ensure RHACM is deployed and operational in your environment.
+# 	Hub Cluster Access: Administrator access to the RHACM Hub cluster.
+# 	Managed Cluster Access: Administrator access to the existing OCP cluster to be added.
+# 	OC CLI Installed: The oc CLI must be installed and authenticated to the target OpenShift clusters.
+# 	Network Configuration: Ensure network connectivity between the managed cluster and the RHACM Hub cluster.				
+# - Procedure
+# 	Register the Existing OpenShift Cluster
+# 		Log in to the RHACM web console.
+# 		Navigate to Clusters > Create Cluster.
+# 		Select Import an existing cluster.
+# 		Provide a name for the cluster and click Generate Command.
+# 		Copy the import command.
+# - Execute the Import Command on the Managed Cluster
+# 		Log in to the existing OpenShift cluster to be managed.
+# 		Paste and execute the import command provided by RHACM
+# 		Verify that the managed cluster components are deployed:
+# 		oc get pods -n open-cluster-management-agent
+# - Verify Cluster Registration
+# 	Return to the RHACM web console.
+# 	Confirm that the newly added cluster appears in the Clusters list and its status is Ready.
+# 	Review the cluster’s details and configuration.
+# 
