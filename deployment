@@ -186,6 +186,15 @@ platform:
 fips: false 
 pullSecret: '{"auths": ...}' 
 sshKey: 'ssh-ed25519 AAAA...'
+proxy:
+  httpProxy: http://<username>:<pswd>@<ip>:<port> 
+  httpsProxy: https://<username>:<pswd>@<ip>:<port> 
+  noProxy: example.com 
+additionalTrustBundle: | 
+    -----BEGIN CERTIFICATE-----
+    <MY_TRUSTED_CA_CERT>
+    -----END CERTIFICATE-----
+additionalTrustBundlePolicy: <policy_to_add_additionalTrustBundle> 
 ###
 
 cp installation/ocp4/install-config.yaml installation/backup/
