@@ -177,11 +177,11 @@ metadata:
   name: ocp-redhat
 networking:
   clusterNetwork:
-  - cidr: 10.128.0.0/14 
+  - cidr: 10.234.0.0/16 
     hostPrefix: 23 
   networkType: OVNKubernetes
   serviceNetwork: 
-  - 172.30.0.0/16
+  - 10.233.0.0/17
 platform:
   none: {} 
 fips: false 
