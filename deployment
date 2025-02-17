@@ -24,7 +24,7 @@ timedatectl set-ntp true (configure ntp to sync)
 setsebool -P haproxy_connect_any=1
 #getsebool -a | grep -i haproxy
 semanage port -a -t http_port_t -p tcp 8080
-#semanage port -m -t http_port_t -p tcp 8002
+#semanage port -m -t http_port_t -p tcp 8080
 semanage fcontext -a -t httpd_sys_content_t "/var/www(/.*)?"
 restorecon -Rv /var/www/
 
