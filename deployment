@@ -52,6 +52,7 @@ server=192.168.1.4
 address=/apps.ocp-redhat.bcaf.lab/10.19.4.34
 ###
 systemctl restart dnsmasq
+#CHANGE DNS IN BASTION USE IP BASTION
 
 vi /etc/hosts
 ###
