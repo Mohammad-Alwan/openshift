@@ -39,9 +39,9 @@ systemctl restart httpd
 vi /etc/dnsmasq.conf
 ####
 interface=<interface_name> ##rhel 9 issue
-srv-host=_etcd-server-ssl._tcp.ocp-redhat.bcaf.lab,etcd-0.ocp-redhat.bcaf.lab,2380,0,10
 srv-host=_etcd-server-ssl._tcp.ocp-redhat.bcaf.lab,etcd-1.ocp-redhat.bcaf.lab,2380,0,10
 srv-host=_etcd-server-ssl._tcp.ocp-redhat.bcaf.lab,etcd-2.ocp-redhat.bcaf.lab,2380,0,10
+srv-host=_etcd-server-ssl._tcp.ocp-redhat.bcaf.lab,etcd-3.ocp-redhat.bcaf.lab,2380,0,10
 no-dhcp-interface=
 no-hosts
 addn-hosts=/etc/hosts
@@ -60,18 +60,18 @@ vi /etc/hosts
 10.19.4.34 bastion.ocp-redhat.bcaf.lab bastion
 #Master
 10.19.4.35 bootstrap.ocp-redhat.bcaf.lab bootstrap
-10.19.4.36 master0.ocp-redhat.bcaf.lab master0
-10.19.4.36 etcd-0.ocp-redhat.bcaf.lab
-10.19.4.37 master1.ocp-redhat.bcaf.lab master1
-10.19.4.37 etcd-1.ocp-redhat.bcaf.lab
-10.19.4.38 master2.ocp-redhat.bcaf.lab master2
-10.19.4.38 etcd-2.ocp-redhat.bcaf.lab
+10.19.4.36 master1.ocp-redhat.bcaf.lab master1
+10.19.4.36 etcd-1.ocp-redhat.bcaf.lab
+10.19.4.37 master2.ocp-redhat.bcaf.lab master2
+10.19.4.37 etcd-2.ocp-redhat.bcaf.lab
+10.19.4.38 master3.ocp-redhat.bcaf.lab master3
+10.19.4.38 etcd-3.ocp-redhat.bcaf.lab
 #Worker
-10.19.4.39 worker0.ocp-redhat.bcaf.lab worker0
-10.19.4.40 worker1.ocp-redhat.bcaf.lab worker1
+10.19.4.39 worker1.ocp-redhat.bcaf.lab worker1
+10.19.4.40 worker2.ocp-redhat.bcaf.lab worker2
 ##infra (for monitoring and logging usage only with elasticsearch and grafana)
-#10.19.4.201 infra0.clustername.fqdn infra0
-#10.19.4.202 infra1.clustername.fqdn infra1
+#10.19.4.201 infra0.clustername.fqdn infra1
+#10.19.4.202 infra1.clustername.fqdn infra2
 #api
 10.19.4.34 api-int.ocp-redhat.bcaf.lab api-int
 10.19.4.34 api.ocp-redhat.bcaf.lab api
@@ -118,31 +118,31 @@ listen api-server-6443
        bind *:6443
        mode tcp
        server bootstrap bootstrap.ocp-redhat.bcaf.lab:6443 check inter 1s backup
-       server master0 master0.ocp-redhat.bcaf.lab:6443 check inter 1s
        server master1 master1.ocp-redhat.bcaf.lab:6443 check inter 1s
        server master2 master2.ocp-redhat.bcaf.lab:6443 check inter 1s
+       server master3 master3.ocp-redhat.bcaf.lab:6443 check inter 1s
 
 listen machine-config-server-22623
        bind *:22623
        mode tcp
        server bootstrap bootstrap.ocp-redhat.bcaf.lab:22623 check inter 1s backup
-       server master0 master0.ocp-redhat.bcaf.lab:22623 check inter 1s
        server master1 master1.ocp-redhat.bcaf.lab:22623 check inter 1s
        server master2 master2.ocp-redhat.bcaf.lab:22623 check inter 1s
+       server master3 master3.ocp-redhat.bcaf.lab:22623 check inter 1s
 
 listen ingress-router-443
        bind *:443
        mode tcp
        balance source
-       server worker0 worker0.ocp-redhat.bcaf.lab:443 check inter 1s
        server worker1 worker1.ocp-redhat.bcaf.lab:443 check inter 1s
+       server worker2 worker2.ocp-redhat.bcaf.lab:443 check inter 1s
 
 listen ingress-router-80
        bind *:80
        mode tcp
        balance source
-       server worker0 worker0.ocp-redhat.bcaf.lab:80 check inter 1s
        server worker1 worker1.ocp-redhat.bcaf.lab:80 check inter 1s
+       server worker2 worker2.ocp-redhat.bcaf.lab:80 check inter 1s
 
 ###
 systemctl restart haproxy
